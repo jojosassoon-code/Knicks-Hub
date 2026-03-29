@@ -37,6 +37,7 @@ const NBA_STATS_HEADERS = {
 };
 
 const REVALIDATE_SECONDS = 60 * 60 * 6;
+const NBA_STATS_TIMEOUT_MS = 6000;
 
 function getValue<T>(
   row: Array<string | number | null>,
@@ -80,10 +81,19 @@ function readResultSet(data: unknown, targetName?: string): ResultSet | null {
 }
 
 async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url, {
-    next: { revalidate: REVALIDATE_SECONDS },
-    headers: NBA_STATS_HEADERS,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), NBA_STATS_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      next: { revalidate: REVALIDATE_SECONDS },
+      headers: NBA_STATS_HEADERS,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!res.ok) {
     throw new Error(`NBA stats error ${res.status} for ${url}`);

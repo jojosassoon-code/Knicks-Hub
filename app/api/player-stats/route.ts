@@ -39,11 +39,10 @@ export async function GET() {
           season: 'unknown',
           notes: [
             'Current roster or recent-minute data could not be verified.',
-            'Analyst Mode will withhold X-factor picks instead of showing stale players.',
+            'Analyst Mode is using a safe fallback and will withhold X-factor picks instead of showing stale players.',
           ],
         },
       } satisfies PlayerStatsResponse,
-      { status: 503 },
     );
   }
 }

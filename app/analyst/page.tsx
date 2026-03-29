@@ -595,6 +595,19 @@ type PlayerData = {
   integrity: PlayerStatsResponse['integrity'];
 };
 
+async function fetchJsonWithTimeout<T>(url: string, timeoutMs: number): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`${response.status}`);
+    return (await response.json()) as T;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 const ALL_TEAMS = [
   { tri: 'ATL', name: 'Atlanta Hawks' },
   { tri: 'BOS', name: 'Boston Celtics' },
@@ -635,19 +648,47 @@ export default function AnalystPage() {
   const [fetchError, setFetchError] = useState('');
 
   useEffect(() => {
-    // Fetch team stats and player stats in parallel
-    Promise.all([
-      fetch('/api/nba-stats').then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); }),
-      fetch('/api/player-stats')
-        .then(async r => (await r.json()) as PlayerData)
-        .catch(() => null),
-    ])
-      .then(([teamStats, players]) => {
-        setData(teamStats as ApiData);
-        if (players) setPlayerData(players as PlayerData);
+    let cancelled = false;
+
+    async function loadAnalystMode() {
+      try {
+        const teamStats = await fetchJsonWithTimeout<ApiData>('/api/nba-stats', 10000);
+        if (cancelled) return;
+
+        setData(teamStats);
         setLoading(false);
-      })
-      .catch(() => { setFetchError('Could not load stats. Please refresh.'); setLoading(false); });
+      } catch {
+        if (cancelled) return;
+        setFetchError('Could not load stats. Please refresh.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const players = await fetchJsonWithTimeout<PlayerData>('/api/player-stats', 4000);
+        if (cancelled) return;
+        setPlayerData(players);
+      } catch {
+        if (cancelled) return;
+        setPlayerData({
+          byTeam: {},
+          integrity: {
+            ok: false,
+            season: 'unknown',
+            notes: [
+              'Current roster or recent-minute data could not be verified.',
+              'Analyst Mode is using a safe fallback and will withhold X-factor picks instead of showing stale players.',
+            ],
+          },
+        });
+      }
+    }
+
+    loadAnalystMode();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const analysis = useMemo(() => {
