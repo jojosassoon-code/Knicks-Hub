@@ -6,7 +6,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import type { TeamStat, GameSummary } from '@/app/api/nba-stats/route';
-import type { PlayerStat } from '@/app/api/player-stats/route';
+import type { PlayerStatsResponse } from '@/app/api/player-stats/route';
+import { selectXFactor, type PlayerStat } from '@/lib/analyst';
 import { getOpponentColor } from '@/lib/teamColors';
 import { getCoach } from '@/lib/coaches';
 import PageHeader from '@/components/ui/PageHeader';
@@ -232,6 +233,10 @@ function XFactorCard({
         {/* Reason */}
         <p className="text-sm leading-relaxed" style={{ color: 'rgba(147,197,253,0.75)' }}>
           {reason}
+        </p>
+
+        <p className="mt-3 text-xs" style={{ color: 'rgba(147,197,253,0.45)' }}>
+          Current roster verified. Recent role: {player.recentMin.toFixed(1)} MPG across {player.recentGamesPlayed} of the last 10 games.
         </p>
       </div>
     </div>
@@ -587,6 +592,7 @@ type ApiData = {
 
 type PlayerData = {
   byTeam: Record<string, PlayerStat[]>;
+  integrity: PlayerStatsResponse['integrity'];
 };
 
 const ALL_TEAMS = [
@@ -632,7 +638,9 @@ export default function AnalystPage() {
     // Fetch team stats and player stats in parallel
     Promise.all([
       fetch('/api/nba-stats').then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); }),
-      fetch('/api/player-stats').then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch('/api/player-stats')
+        .then(async r => (await r.json()) as PlayerData)
+        .catch(() => null),
     ])
       .then(([teamStats, players]) => {
         setData(teamStats as ApiData);
@@ -681,53 +689,29 @@ export default function AnalystPage() {
     const oppPlayers = playerData.byTeam[selected] ?? [];
     if (nykPlayers.length === 0 || oppPlayers.length === 0) return null;
 
-    // Sort helpers
-    const byPts = (arr: PlayerStat[]) => [...arr].sort((a, b) => b.pts - a.pts);
-    const byReb = (arr: PlayerStat[]) => [...arr].sort((a, b) => b.reb - a.reb);
-    const by3P  = (arr: PlayerStat[]) => [...arr].sort((a, b) => b.threePct - a.threePct);
+    const nykPick = selectXFactor(
+      nykPlayers,
+      'NYK',
+      selected,
+      analysis.opp.papg,
+      analysis.opp.ppg,
+    );
+    const oppPick = selectXFactor(
+      oppPlayers,
+      selected,
+      'NYK',
+      analysis.nyk.papg,
+      analysis.nyk.ppg,
+    );
 
-    // X-Factor: find which Knicks player best exploits opponent's weakness
-    // Weakness = high PAPG → use scoring. Poor 3P defense proxy = NYK 3PT volume player.
-    // If opponent's PAPG > 112 (porous), X-factor = 2nd scorer (surprise threat)
-    // If opponent PPG > 118 (fast pace), X-factor = best 3P shooter
-    // Otherwise, X-factor = best rebounder who tilts pace/possession battle
-    let nykXFactor: PlayerStat;
-    let nykReason: string;
-    const oppPapg = analysis.opp.papg;
-    const oppPpg  = analysis.opp.ppg;
+    if (!nykPick || !oppPick) return null;
 
-    if (oppPapg > 112) {
-      // Weak defense — secondary scorer can put up big numbers
-      nykXFactor = byPts(nykPlayers)[1] ?? byPts(nykPlayers)[0];
-      nykReason = `${nykXFactor.name.split(' ').pop()} can go off against a ${selected} defense that allows ${oppPapg.toFixed(1)} PPG — one of the league's most porous.`;
-    } else if (oppPpg > 117) {
-      // High-pace opponent — 3PT shooting wins the pace battle
-      nykXFactor = by3P(nykPlayers)[0];
-      nykReason = `${nykXFactor.name.split(' ').pop()}'s ${nykXFactor.threePct.toFixed(1)}% from three is crucial to keep up with ${selected}'s high-powered ${oppPpg.toFixed(1)} PPG offense.`;
-    } else {
-      // Grind it out — rebounder and grit player matters most
-      nykXFactor = byReb(nykPlayers)[0];
-      nykReason = `${nykXFactor.name.split(' ').pop()}'s ${nykXFactor.reb.toFixed(1)} RPG controls the glass against a ${selected} team that limits points — possession battle is the key.`;
-    }
-
-    // Opponent X-Factor: their player who most exploits Knicks' weakness
-    let oppXFactor: PlayerStat;
-    let oppReason: string;
-    const nykPapg = analysis.nyk.papg;
-    const nykPpg  = analysis.nyk.ppg;
-
-    if (nykPapg > 112) {
-      oppXFactor = byPts(oppPlayers)[1] ?? byPts(oppPlayers)[0];
-      oppReason = `${oppXFactor.name.split(' ').pop()} can exploit a Knicks defense that gives up ${nykPapg.toFixed(1)} PPG — enough room for a secondary scorer to take over.`;
-    } else if (nykPpg > 117) {
-      oppXFactor = by3P(oppPlayers)[0];
-      oppReason = `${oppXFactor.name.split(' ').pop()}'s ${oppXFactor.threePct.toFixed(1)}% from deep gives ${selected} a weapon if they need to match New York's ${nykPpg.toFixed(1)} PPG firepower.`;
-    } else {
-      oppXFactor = byReb(oppPlayers)[0];
-      oppReason = `${oppXFactor.name.split(' ').pop()}'s ${oppXFactor.reb.toFixed(1)} RPG can tilt the possession battle against a disciplined Knicks defense.`;
-    }
-
-    return { nykXFactor, nykReason, oppXFactor, oppReason };
+    return {
+      nykXFactor: nykPick.player,
+      nykReason: nykPick.reason,
+      oppXFactor: oppPick.player,
+      oppReason: oppPick.reason,
+    };
   }, [playerData, selected, analysis]);
 
   return (
@@ -1172,6 +1156,9 @@ export default function AnalystPage() {
                   teamLabel={`${analysis.opp.city} ${analysis.opp.name}`}
                 />
               </div>
+              <p className="mt-4 text-xs" style={{ color: 'rgba(147,197,253,0.45)' }}>
+                Guardrails: only current-roster players with meaningful recent rotation minutes are eligible for X-factor selection.
+              </p>
             </section>
           ) : (
             analysis && (
@@ -1180,7 +1167,9 @@ export default function AnalystPage() {
                   05 — X-FACTORS
                 </h2>
                 <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: '#111d35', border: '1px solid rgba(0,107,182,0.25)' }}>
-                  <p style={{ color: 'rgba(147,197,253,0.5)' }}>Player data unavailable right now.</p>
+                  <p style={{ color: 'rgba(147,197,253,0.5)' }}>
+                    {playerData?.integrity.notes[0] ?? 'Player data unavailable right now.'}
+                  </p>
                 </div>
               </section>
             )
