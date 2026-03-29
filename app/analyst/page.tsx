@@ -9,6 +9,8 @@ import type { TeamStat, GameSummary } from '@/app/api/nba-stats/route';
 import type { PlayerStat } from '@/app/api/player-stats/route';
 import { getOpponentColor } from '@/lib/teamColors';
 import { getCoach } from '@/lib/coaches';
+import PageHeader from '@/components/ui/PageHeader';
+import StatePanel from '@/components/ui/StatePanel';
 
 const NYK_BLUE   = '#006BB6';
 const NYK_ORANGE = '#F58426';
@@ -732,22 +734,11 @@ export default function AnalystPage() {
     <div className="space-y-8 fade-in pb-16">
 
       {/* ── Header ── */}
-      <div className="section-label">
-        <div>
-          <h1 style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(2.2rem, 6vw, 3.5rem)',
-            color: '#FFFFFF',
-            letterSpacing: '0.06em',
-            lineHeight: 1,
-          }}>
-            ANALYST MODE
-          </h1>
-          <p className="mt-2 text-sm" style={{ color: '#8899AA' }}>
-            2025–26 Season · Matchup Analysis · New York Knicks
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="ANALYST MODE"
+        eyebrow="MATCHUP LAB"
+        metadata={['2025-26 Season', 'Matchup Analysis', 'New York Knicks']}
+      />
 
       {/* ── Opponent Selector ── */}
       <div
@@ -785,22 +776,28 @@ export default function AnalystPage() {
 
       {/* ── Error ── */}
       {fetchError && (
-        <p className="text-red-400 text-center py-8">{fetchError}</p>
+        <StatePanel
+          title="Could not load matchup data"
+          body={fetchError}
+          variant="error"
+        />
       )}
 
       {/* ── Placeholder before selection ── */}
+      {loading && !fetchError && (
+        <StatePanel
+          title="Loading matchup data"
+          body="Crunching team stats and player averages for Analyst Mode."
+          variant="info"
+        />
+      )}
+
       {!selected && !loading && !fetchError && (
-        <div
-          className="rounded-2xl p-12 text-center"
-          style={{ backgroundColor: '#111d35', border: '1px dashed rgba(0,107,182,0.3)' }}
-        >
-          <p style={{ fontFamily: 'Oswald, sans-serif', fontSize: '1.5rem', color: 'rgba(255,255,255,0.3)', letterSpacing: '0.06em' }}>
-            SELECT AN OPPONENT ABOVE
-          </p>
-          <p style={{ color: 'rgba(147,197,253,0.3)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-            Head-to-head record, team DNA comparison, and scouting report will appear here.
-          </p>
-        </div>
+        <StatePanel
+          title="Select an opponent"
+          body="Head-to-head record, team DNA comparison, and scouting notes will appear here."
+          variant="empty"
+        />
       )}
 
       {/* ── Analysis Sections ── */}
@@ -1183,7 +1180,7 @@ export default function AnalystPage() {
                   05 — X-FACTORS
                 </h2>
                 <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: '#111d35', border: '1px solid rgba(0,107,182,0.25)' }}>
-                  <p style={{ color: 'rgba(147,197,253,0.5)' }}>Player data unavailable — please refresh.</p>
+                  <p style={{ color: 'rgba(147,197,253,0.5)' }}>Player data unavailable right now.</p>
                 </div>
               </section>
             )

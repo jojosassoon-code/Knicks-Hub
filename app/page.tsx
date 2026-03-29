@@ -1,225 +1,284 @@
-// app/page.tsx — Home Page (/)
-import { getKnicksGames, computeRecord, getNextGame, getRecentResults } from '@/lib/nba';
 import Link from 'next/link';
+import SectionShell from '@/components/ui/SectionShell';
+import StatePanel from '@/components/ui/StatePanel';
+import StatCard from '@/components/ui/StatCard';
+import {
+  computeRecord,
+  getCurrentStreak,
+  getGameMatchupLabel,
+  getGameMatchupShortLabel,
+  getGameRelativeLabel,
+  getGameTipoffLabel,
+  getKnicksDashboardData,
+  getNextGame,
+  getRecentRecord,
+} from '@/lib/nba';
+import { formatCalendarDate } from '@/lib/time';
 
-function formatGameDate(dateStr: string) {
-  return new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', {
-    weekday: 'long', month: 'short', day: 'numeric',
-  });
-}
-
-function formatGameTime(datetimeStr: string) {
-  if (!datetimeStr) return 'TBD';
-  const d = new Date(datetimeStr);
-  if (d.getUTCHours() === 0) return 'TBD';
-  return d.toLocaleTimeString('en-US', {
-    hour: 'numeric', minute: '2-digit',
-    timeZone: 'America/New_York', timeZoneName: 'short',
-  });
-}
-
-function daysUntil(dateStr: string): number {
-  const target = new Date(`${dateStr}T12:00:00`);
-  const now = new Date();
-  return Math.ceil((target.getTime() - now.getTime()) / 86400000);
+function winPctLabel(wins: number, losses: number) {
+  const total = wins + losses;
+  return `${((wins / (total || 1)) * 100).toFixed(1)}% win rate`;
 }
 
 export default async function HomePage() {
-  let games;
+  let data: Awaited<ReturnType<typeof getKnicksDashboardData>> | null = null;
+
   try {
-    games = await getKnicksGames();
-  } catch {
+    data = await getKnicksDashboardData();
+  } catch {}
+
+  if (!data) {
     return (
-      <div className="text-center py-20 fade-in">
-        <p style={{ color: '#FF3D3D', fontSize: '1.1rem' }}>Could not load data. Please try again later.</p>
-      </div>
+      <StatePanel
+        title="Could not load Knicks dashboard"
+        body="The schedule feed did not return cleanly. Please try again in a moment."
+        variant="error"
+      />
     );
   }
 
-  const record   = computeRecord(games);
+  const { games, standings, updatedAtLabel } = data;
+  const record = computeRecord(games);
   const nextGame = getNextGame(games);
-  const last10   = getRecentResults(games, 10);
-  const winPct   = ((record.wins / (record.wins + record.losses || 1)) * 100).toFixed(1);
-
-  const l10 = last10.reduce(
-    (acc, g) => {
-      const knicksHome = g.home_team.abbreviation === 'NYK';
-      const scored  = knicksHome ? g.home_team_score : g.visitor_team_score;
-      const allowed = knicksHome ? g.visitor_team_score : g.home_team_score;
-      return scored > allowed ? { ...acc, w: acc.w + 1 } : { ...acc, l: acc.l + 1 };
-    },
-    { w: 0, l: 0 },
-  );
-
-  const nextOpponentShort = nextGame
-    ? nextGame.home_team.abbreviation === 'NYK'
-      ? `vs ${nextGame.visitor_team.abbreviation}`
-      : `@ ${nextGame.home_team.abbreviation}`
-    : null;
-
-  const nextOpponentFull = nextGame
-    ? nextGame.home_team.abbreviation === 'NYK'
-      ? `vs ${nextGame.visitor_team.full_name}`
-      : `@ ${nextGame.home_team.full_name}`
-    : null;
-
-  const formLabel = l10.w >= 8 ? 'On Fire 🔥' : l10.w >= 6 ? 'Playing Well' : l10.w >= 4 ? 'Mixed Bag' : 'Rough Stretch';
+  const last10 = getRecentRecord(games, 10);
+  const streak = getCurrentStreak(games);
+  const knicksStanding = standings.find(row => row.team.abbreviation === 'NYK');
 
   return (
     <div className="space-y-12">
+      <section
+        className="hero-mesh rounded-3xl overflow-hidden fade-in relative"
+        style={{ border: '1px solid #1E2D3D' }}
+      >
+        <div className="absolute inset-0 pointer-events-none">
+          <div
+            style={{
+              position: 'absolute',
+              inset: '10% auto auto 8%',
+              width: '16rem',
+              height: '16rem',
+              background: 'radial-gradient(circle, rgba(0,107,182,0.18) 0%, transparent 70%)',
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              right: '5%',
+              bottom: '8%',
+              width: '14rem',
+              height: '14rem',
+              background: 'radial-gradient(circle, rgba(245,132,38,0.14) 0%, transparent 72%)',
+            }}
+          />
+        </div>
 
-      {/* ── Hero ── */}
-      <section className="hero-mesh rounded-3xl overflow-hidden fade-in" style={{ border: '1px solid #1E2D3D' }}>
-        <div className="px-8 py-14 sm:py-20 text-center relative">
-          {/* Glow accent */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div style={{
-              width: '50%', height: '60%',
-              background: 'radial-gradient(ellipse, rgba(0,107,182,0.12) 0%, transparent 70%)',
-            }} />
-          </div>
-
-          <p className="text-xs font-semibold tracking-widest mb-4" style={{ color: '#F58426', fontFamily: 'var(--font-body)', letterSpacing: '0.2em' }}>
-            2025 – 26 SEASON
-          </p>
-
-          <h1 style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(3.5rem, 12vw, 7rem)',
-            lineHeight: 0.92,
-            letterSpacing: '0.04em',
-            color: '#FFFFFF',
-          }}>
-            <span style={{ color: '#F58426' }}>NEW YORK</span>
-            <br />KNICKS
-          </h1>
-
-          {/* Record pill */}
-          <div className="flex items-center justify-center gap-4 mt-8 flex-wrap">
-            <div
-              className="inline-flex items-center gap-3 px-6 py-3 rounded-full"
-              style={{ backgroundColor: 'rgba(0,107,182,0.25)', border: '1px solid rgba(0,107,182,0.5)' }}
-            >
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', color: '#FFFFFF', letterSpacing: '0.05em' }}>
-                {record.wins}–{record.losses}
-              </span>
-              <span style={{ color: '#8899AA', fontSize: '0.85rem' }}>·</span>
-              <span style={{ color: '#8899AA', fontSize: '0.85rem' }}>{winPct}% WIN</span>
+        <div className="relative px-6 py-8 sm:px-10 sm:py-10">
+          <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-2xl">
+              <p
+                className="text-xs font-semibold tracking-widest mb-4"
+                style={{ color: '#F58426', letterSpacing: '0.2em' }}
+              >
+                KNICKS CONTROL CENTER
+              </p>
+              <h1
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 'clamp(3.25rem, 10vw, 6.5rem)',
+                  lineHeight: 0.92,
+                  letterSpacing: '0.04em',
+                  color: '#FFFFFF',
+                }}
+              >
+                <span style={{ color: '#F58426' }}>NEW YORK</span>
+                <br />
+                KNICKS
+              </h1>
+              <p className="mt-5 max-w-xl text-sm sm:text-base" style={{ color: '#AFC0D2', lineHeight: 1.7 }}>
+                Built around the next thing a fan wants to know: where the Knicks sit, who is next,
+                how they are trending, and where to jump for the deeper context.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2 text-xs">
+                {[
+                  knicksStanding ? `East #${knicksStanding.rank}` : '',
+                  `${record.wins}-${record.losses}`,
+                  streak.type ? `${streak.type}${streak.count} streak` : 'No streak yet',
+                  updatedAtLabel,
+                ].filter(Boolean).map(item => (
+                  <span
+                    key={item}
+                    className="px-3 py-1.5 rounded-full"
+                    style={{
+                      color: '#DCE7F3',
+                      backgroundColor: 'rgba(15,25,35,0.72)',
+                      border: '1px solid rgba(30,45,61,0.8)',
+                    }}
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Next game card */}
-          {nextGame && (
             <div
-              className="mt-8 inline-block rounded-2xl px-8 py-4 text-center"
+              className="card rounded-3xl p-6 w-full xl:max-w-md"
               style={{
-                backgroundColor: 'rgba(15,25,35,0.8)',
-                border: '1px solid rgba(245,132,38,0.35)',
-                backdropFilter: 'blur(8px)',
+                backgroundColor: 'rgba(11,20,31,0.84)',
+                backdropFilter: 'blur(10px)',
               }}
             >
-              <p className="text-xs tracking-widest mb-2" style={{ color: '#F58426', fontFamily: 'var(--font-body)' }}>
+              <p
+                className="text-xs font-semibold tracking-widest"
+                style={{ color: '#F58426', letterSpacing: '0.18em' }}
+              >
                 NEXT GAME
               </p>
-              <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', color: '#FFFFFF', letterSpacing: '0.05em' }}>
-                {nextOpponentFull}
-              </p>
-              <p className="text-sm mt-1" style={{ color: '#8899AA' }}>
-                {formatGameDate(nextGame.date)} · {formatGameTime(nextGame.datetime)}
-              </p>
-              {daysUntil(nextGame.date) === 0 && (
-                <p className="text-xs mt-1 font-semibold" style={{ color: '#00C853' }}>TONIGHT</p>
-              )}
-              {daysUntil(nextGame.date) === 1 && (
-                <p className="text-xs mt-1 font-semibold" style={{ color: '#FFD600' }}>TOMORROW</p>
+              {nextGame ? (
+                <>
+                  <h2
+                    className="mt-3"
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: '2.3rem',
+                      lineHeight: 1,
+                      letterSpacing: '0.05em',
+                      color: '#FFFFFF',
+                    }}
+                  >
+                    {getGameMatchupShortLabel(nextGame)}
+                  </h2>
+                  <p className="mt-2 text-base" style={{ color: '#DCE7F3' }}>
+                    {getGameMatchupLabel(nextGame)}
+                  </p>
+                  <div className="mt-4 space-y-1 text-sm" style={{ color: '#8899AA' }}>
+                    <p>{formatCalendarDate(nextGame.date)}</p>
+                    <p>{getGameTipoffLabel(nextGame)}</p>
+                  </div>
+                  {getGameRelativeLabel(nextGame) && (
+                    <span
+                      className="inline-flex mt-4 px-3 py-1.5 rounded-full text-xs font-semibold"
+                      style={{
+                        backgroundColor: 'rgba(245,132,38,0.14)',
+                        color: '#F58426',
+                        border: '1px solid rgba(245,132,38,0.3)',
+                        letterSpacing: '0.1em',
+                      }}
+                    >
+                      {getGameRelativeLabel(nextGame)}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <p className="mt-4" style={{ color: '#8899AA' }}>
+                  No upcoming regular-season games were found.
+                </p>
               )}
             </div>
-          )}
+          </div>
         </div>
       </section>
 
-      {/* ── Stat Cards ── */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 fade-in-delay">
-
-        {/* Record */}
-        <div className="card rounded-2xl p-7 text-center">
-          <p className="text-xs font-semibold tracking-widest mb-3" style={{ color: '#F58426', fontFamily: 'var(--font-body)', letterSpacing: '0.18em' }}>
-            SEASON RECORD
-          </p>
-          <p style={{ fontFamily: 'var(--font-display)', fontSize: '3.5rem', color: '#FFFFFF', lineHeight: 1 }}>
-            {record.wins}–{record.losses}
-          </p>
-          <p className="text-xs mt-2" style={{ color: '#8899AA' }}>
-            {winPct}% win rate
-          </p>
-        </div>
-
-        {/* Last 10 */}
-        <div className="card rounded-2xl p-7 text-center">
-          <p className="text-xs font-semibold tracking-widest mb-3" style={{ color: '#F58426', fontFamily: 'var(--font-body)', letterSpacing: '0.18em' }}>
-            LAST 10 GAMES
-          </p>
-          <p style={{ fontFamily: 'var(--font-display)', fontSize: '3.5rem', color: '#FFFFFF', lineHeight: 1 }}>
-            {l10.w}–{l10.l}
-          </p>
-          <p className="text-xs mt-2" style={{ color: l10.w >= 6 ? '#00C853' : l10.w >= 4 ? '#FFD600' : '#FF3D3D' }}>
-            {formLabel}
-          </p>
-        </div>
-
-        {/* Next game */}
-        <div className="card rounded-2xl p-7 text-center">
-          <p className="text-xs font-semibold tracking-widest mb-3" style={{ color: '#F58426', fontFamily: 'var(--font-body)', letterSpacing: '0.18em' }}>
-            UP NEXT
-          </p>
-          {nextGame ? (
-            <>
-              <p style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', color: '#FFFFFF', lineHeight: 1.1 }}>
-                {nextOpponentShort}
-              </p>
-              <p className="text-xs mt-2" style={{ color: '#8899AA' }}>
-                {formatGameDate(nextGame.date)}
-              </p>
-              <p className="text-xs mt-1" style={{ color: '#8899AA' }}>
-                {formatGameTime(nextGame.datetime)}
-              </p>
-            </>
-          ) : (
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: '#8899AA' }}>Season Over</p>
-          )}
-        </div>
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 fade-in-delay">
+        <StatCard
+          label="EAST SEED"
+          value={knicksStanding ? `#${knicksStanding.rank}` : '—'}
+          detail={knicksStanding ? `${knicksStanding.gb === 0 ? 'Conference lead' : `${knicksStanding.gb.toFixed(knicksStanding.gb % 1 === 0 ? 0 : 1)} GB`} in the East` : 'Standings unavailable'}
+          accent="#006BB6"
+        />
+        <StatCard
+          label="RECORD"
+          value={`${record.wins}–${record.losses}`}
+          detail={winPctLabel(record.wins, record.losses)}
+        />
+        <StatCard
+          label="CURRENT STREAK"
+          value={streak.type ? `${streak.type}${streak.count}` : '—'}
+          detail={streak.type ? `${streak.type === 'W' ? 'Wins' : 'Losses'} in a row` : 'No completed games yet'}
+          accent={streak.type === 'L' ? '#FF3D3D' : '#F58426'}
+        />
+        <StatCard
+          label="LAST 10"
+          value={`${last10.wins}–${last10.losses}`}
+          detail={last10.wins >= 7 ? 'Trending up' : last10.wins >= 5 ? 'Holding steady' : 'Needs attention'}
+          accent={last10.wins >= 7 ? '#00C853' : last10.wins >= 5 ? '#F58426' : '#FF3D3D'}
+        />
       </section>
 
-      {/* ── Quick Links ── */}
-      <section className="fade-in-delay-2">
-        <div className="section-label mb-6">
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: '#FFFFFF', letterSpacing: '0.06em' }}>
-            EXPLORE
-          </h2>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { href: '/standings', label: 'Standings', sub: 'East Conference', icon: '📊' },
-            { href: '/schedule',  label: 'Schedule',  sub: '2025–26 Season', icon: '📅' },
-            { href: '/analyst',   label: 'Analyst',   sub: 'Matchup Analysis', icon: '🔬' },
-            { href: '/news',      label: 'News',      sub: 'Latest Headlines', icon: '📰' },
-          ].map(({ href, label, sub, icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="card card-orange rounded-2xl p-5 text-center block"
-              style={{ textDecoration: 'none' }}
-            >
-              <div className="text-3xl mb-3">{icon}</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#FFFFFF', letterSpacing: '0.06em' }}>
-                {label.toUpperCase()}
-              </div>
-              <div className="text-xs mt-1" style={{ color: '#8899AA' }}>{sub}</div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-6 fade-in-delay-2">
+        <SectionShell
+          title="FAST PATHS"
+          subtitle="Jump into the three views that matter most on game day."
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { href: '/standings', label: 'Standings', sub: 'Conference race and playoff line', icon: '📊' },
+              { href: '/schedule', label: 'Schedule', sub: 'Upcoming games and recent results', icon: '📅' },
+              { href: '/analyst', label: 'Analyst', sub: 'Matchup breakdowns and scouting', icon: '🔬' },
+            ].map(link => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="card card-orange rounded-2xl p-5 block"
+                style={{ textDecoration: 'none' }}
+              >
+                <div className="text-3xl mb-3">{link.icon}</div>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '1.15rem',
+                    color: '#FFFFFF',
+                    letterSpacing: '0.06em',
+                  }}
+                >
+                  {link.label.toUpperCase()}
+                </div>
+                <p className="mt-2 text-sm" style={{ color: '#8899AA', lineHeight: 1.6 }}>
+                  {link.sub}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </SectionShell>
 
+        <SectionShell
+          title="RACE CHECK"
+          subtitle="Context around where New York sits right now."
+        >
+          <div className="card rounded-2xl p-5 space-y-3">
+            {knicksStanding ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: '#8899AA' }}>Knicks position</span>
+                  <span style={{ color: '#FFFFFF', fontFamily: 'var(--font-display)', fontSize: '1.3rem' }}>
+                    #{knicksStanding.rank} East
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: '#8899AA' }}>Games back</span>
+                  <span style={{ color: '#FFFFFF' }}>
+                    {knicksStanding.gb === 0 ? 'Leading the East' : `${knicksStanding.gb.toFixed(knicksStanding.gb % 1 === 0 ? 0 : 1)} GB`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: '#8899AA' }}>Conference record</span>
+                  <span style={{ color: '#FFFFFF' }}>
+                    {knicksStanding.conferenceWins}-{knicksStanding.conferenceLosses}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: '#8899AA' }}>Point differential</span>
+                  <span style={{ color: '#FFFFFF' }}>
+                    {knicksStanding.pointDifferential > 0 ? '+' : ''}
+                    {knicksStanding.pointDifferential}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p style={{ color: '#8899AA' }}>Standings context is unavailable right now.</p>
+            )}
+          </div>
+        </SectionShell>
+      </div>
     </div>
   );
 }

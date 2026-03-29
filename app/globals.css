@@ -33,6 +33,10 @@ body {
   min-height: 100vh;
 }
 
+button, select, a {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Subtle grain overlay for texture */
 body::after {
   content: '';
@@ -158,3 +162,17 @@ h1, h2, h3, h4 {
   to   { transform: translateX(0);    opacity: 1; }
 }
 .mobile-menu-enter { animation: slideInRight 0.28s cubic-bezier(0.22,1,0.36,1) both; }
+
+/* Shared skeleton surfaces */
+@keyframes skeletonPulse {
+  0% { opacity: 0.45; }
+  50% { opacity: 0.9; }
+  100% { opacity: 0.45; }
+}
+
+.skeleton-block {
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(30,45,61,0.85), rgba(53,72,93,0.85), rgba(30,45,61,0.85));
+  background-size: 200% 100%;
+  animation: skeletonPulse 1.4s ease-in-out infinite;
+}

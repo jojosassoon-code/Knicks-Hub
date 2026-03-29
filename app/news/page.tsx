@@ -1,5 +1,7 @@
 // app/news/page.tsx — News Page (/news)
 import { getKnicksNews, type Article } from '@/lib/news';
+import PageHeader from '@/components/ui/PageHeader';
+import StatePanel from '@/components/ui/StatePanel';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -158,83 +160,41 @@ export default async function NewsPage() {
     <div className="space-y-8 fade-in">
 
       {/* ── Header ── */}
-      <div className="section-label">
-        <div>
-          <h1 style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(2.2rem, 6vw, 3.5rem)',
-            color: '#FFFFFF',
-            letterSpacing: '0.06em',
-            lineHeight: 1,
-          }}>
-            KNICKS NEWS
-          </h1>
-          <p className="mt-2 text-sm" style={{ color: '#8899AA' }}>
-            Latest headlines · Powered by GNews
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="KNICKS NEWS"
+        eyebrow="HEADLINES"
+        metadata={['Latest headlines', 'Powered by GNews']}
+      />
 
       {/* ── No API key ── */}
       {error === 'no_key' && (
-        <div
-          className="rounded-2xl p-12 text-center"
-          style={{
-            backgroundColor: 'rgba(15,25,35,0.8)',
-            border: '1px dashed rgba(245,132,38,0.3)',
-          }}
-        >
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📰</div>
-          <p style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '1.6rem',
-            color: '#FFFFFF',
-            letterSpacing: '0.06em',
-            marginBottom: '0.75rem',
-          }}>
-            NEWS COMING SOON
-          </p>
-          <p style={{ color: '#8899AA', fontSize: '0.9rem', maxWidth: '32rem', margin: '0 auto', lineHeight: 1.6 }}>
-            Add your free GNews API key to enable this page. Open{' '}
-            <code style={{
-              backgroundColor: 'rgba(30,45,61,0.8)',
-              color: '#F58426',
-              padding: '0.15rem 0.5rem',
-              borderRadius: '4px',
-              fontSize: '0.85rem',
-            }}>
-              .env.local
-            </code>{' '}
-            and set{' '}
-            <code style={{
-              backgroundColor: 'rgba(30,45,61,0.8)',
-              color: '#F58426',
-              padding: '0.15rem 0.5rem',
-              borderRadius: '4px',
-              fontSize: '0.85rem',
-            }}>
-              GNEWS_API_KEY=your_key_here
-            </code>
-          </p>
-        </div>
+        <StatePanel
+          title="News coming soon"
+          body={(
+            <>
+              Add your free GNews API key to enable this page. Open <code style={{ color: '#F58426' }}>.env.local</code> and set <code style={{ color: '#F58426' }}>GNEWS_API_KEY=your_key_here</code>.
+            </>
+          )}
+          variant="empty"
+        />
       )}
 
       {/* ── API error ── */}
       {error && error !== 'no_key' && (
-        <div
-          className="rounded-2xl p-8 text-center"
-          style={{
-            backgroundColor: 'rgba(15,25,35,0.8)',
-            border: '1px solid rgba(255,61,61,0.3)',
-          }}
-        >
-          <p style={{ color: '#FF3D3D' }}>Could not load news ({error}). Please try again later.</p>
-        </div>
+        <StatePanel
+          title="Could not load news"
+          body={`The news provider returned ${error}. Please try again later.`}
+          variant="error"
+        />
       )}
 
       {/* ── No articles ── */}
       {!error && articles.length === 0 && (
-        <p style={{ color: '#8899AA' }}>No articles found.</p>
+        <StatePanel
+          title="No articles found"
+          body="The current news search did not return any Knicks articles."
+          variant="empty"
+        />
       )}
 
       {/* ── Magazine layout ── */}

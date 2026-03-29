@@ -1,166 +1,135 @@
-// app/schedule/page.tsx — Schedule Page (/schedule)
+import PageHeader from '@/components/ui/PageHeader';
+import SectionShell from '@/components/ui/SectionShell';
+import StatePanel from '@/components/ui/StatePanel';
 import {
-  getKnicksGames,
+  getGameMatchupLabel,
+  getGameRelativeLabel,
+  getGameTipoffLabel,
+  getKnicksDashboardData,
+  getNextGame,
   getRecentResults,
   getUpcomingGames,
   type Game,
 } from '@/lib/nba';
 import { getOpponentColor } from '@/lib/teamColors';
-
-function formatDate(dateStr: string) {
-  return new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function formatTime(datetimeStr: string) {
-  if (!datetimeStr) return '';
-  const d = new Date(datetimeStr);
-  if (d.getUTCHours() === 0) return '';
-  return d.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'America/New_York',
-    timeZoneName: 'short',
-  });
-}
+import { formatCalendarDate } from '@/lib/time';
 
 function GameCard({ game, isResult }: { game: Game; isResult: boolean }) {
-  const knicksHome    = game.home_team.abbreviation === 'NYK';
-  const opponent      = knicksHome ? game.visitor_team : game.home_team;
-  const locationLabel = knicksHome ? 'vs' : '@';
-  const oppColor      = getOpponentColor(opponent.abbreviation);
+  const knicksHome = game.home_team.abbreviation === 'NYK';
+  const opponent = knicksHome ? game.visitor_team : game.home_team;
+  const opponentColor = getOpponentColor(opponent.abbreviation);
+  const relativeLabel = getGameRelativeLabel(game);
 
-  let isWin = false;
-  let knicksScore = 0;
-  let oppScore    = 0;
+  let scoreLabel = '';
+  let resultColor = '#F58426';
 
   if (isResult) {
-    knicksScore = knicksHome ? game.home_team_score : game.visitor_team_score;
-    oppScore    = knicksHome ? game.visitor_team_score : game.home_team_score;
-    isWin = knicksScore > oppScore;
+    const knicksScore = knicksHome ? game.home_team_score : game.visitor_team_score;
+    const oppScore = knicksHome ? game.visitor_team_score : game.home_team_score;
+    const won = knicksScore > oppScore;
+    scoreLabel = `${won ? 'W' : 'L'} ${knicksScore}-${oppScore}`;
+    resultColor = won ? '#00C853' : '#FF3D3D';
   }
-
-  const accentColor = isResult
-    ? isWin ? '#00C853' : '#FF3D3D'
-    : '#F58426';
-
-  const gameTime = formatTime(game.datetime);
 
   return (
     <div
-      className="card rounded-2xl overflow-hidden transition-all duration-200 hover:scale-[1.01]"
-      style={{
-        borderLeft: `4px solid ${accentColor}`,
-        padding: 0,
-      }}
+      className="card rounded-2xl p-4 sm:p-5"
+      style={{ borderLeft: `4px solid ${resultColor}` }}
     >
-      <div className="px-5 py-4 flex items-center gap-4">
-
-        {/* Date column */}
-        <div className="flex-shrink-0 text-center" style={{ minWidth: '3.5rem' }}>
-          <div style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '1.4rem',
-            color: '#FFFFFF',
-            lineHeight: 1,
-            letterSpacing: '0.04em',
-          }}>
-            {new Date(`${game.date}T12:00:00`).getDate()}
-          </div>
-          <div style={{
-            fontSize: '0.65rem',
-            color: '#8899AA',
-            fontFamily: 'var(--font-body)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-          }}>
-            {new Date(`${game.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short' })}
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div style={{ width: '1px', height: '2.5rem', backgroundColor: '#1E2D3D', flexShrink: 0 }} />
-
-        {/* Matchup */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            {/* Home/Away badge */}
-            <span
-              className="text-xs px-1.5 py-0.5 rounded"
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-4 min-w-0">
+          <div
+            className="rounded-2xl px-3 py-2 text-center flex-shrink-0"
+            style={{ backgroundColor: 'rgba(8,12,20,0.72)', border: '1px solid rgba(30,45,61,0.85)' }}
+          >
+            <div
               style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: '0.65rem',
-                letterSpacing: '0.1em',
-                color: knicksHome ? '#006BB6' : '#8899AA',
-                backgroundColor: knicksHome ? 'rgba(0,107,182,0.15)' : 'rgba(136,153,170,0.1)',
-                border: `1px solid ${knicksHome ? 'rgba(0,107,182,0.3)' : 'rgba(136,153,170,0.2)'}`,
-                flexShrink: 0,
+                fontSize: '1.6rem',
+                lineHeight: 1,
+                color: '#FFFFFF',
               }}
             >
-              {locationLabel.toUpperCase()}
-            </span>
-            {/* Opponent name */}
-            <span style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '1.05rem',
-              color: '#FFFFFF',
-              letterSpacing: '0.04em',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
-              {opponent.full_name}
-            </span>
+              {Number(game.date.slice(8, 10))}
+            </div>
+            <div style={{ color: '#8899AA', fontSize: '0.72rem', letterSpacing: '0.08em' }}>
+              {formatCalendarDate(game.date, { month: 'short' }).toUpperCase()}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Opponent color indicator */}
-            <span
-              className="rounded-full flex-shrink-0"
-              style={{ width: '6px', height: '6px', backgroundColor: oppColor }}
-            />
-            <span style={{ fontSize: '0.75rem', color: '#8899AA', fontFamily: 'var(--font-body)' }}>
-              {formatDate(game.date)}{gameTime ? ` · ${gameTime}` : ''}
-            </span>
+
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className="px-2 py-1 rounded-full text-xs font-semibold"
+                style={{
+                  backgroundColor: knicksHome ? 'rgba(0,107,182,0.15)' : 'rgba(136,153,170,0.12)',
+                  color: knicksHome ? '#4AA9F1' : '#B7C6D8',
+                  border: '1px solid rgba(30,45,61,0.8)',
+                  letterSpacing: '0.08em',
+                }}
+              >
+                {knicksHome ? 'HOME' : 'AWAY'}
+              </span>
+              {relativeLabel && (
+                <span
+                  className="px-2 py-1 rounded-full text-xs font-semibold"
+                  style={{
+                    backgroundColor: 'rgba(245,132,38,0.14)',
+                    color: '#F58426',
+                    border: '1px solid rgba(245,132,38,0.28)',
+                    letterSpacing: '0.08em',
+                  }}
+                >
+                  {relativeLabel}
+                </span>
+              )}
+            </div>
+
+            <p
+              className="mt-3"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: '1.4rem',
+                lineHeight: 1.1,
+                color: '#FFFFFF',
+                letterSpacing: '0.04em',
+              }}
+            >
+              {getGameMatchupLabel(game)}
+            </p>
+
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <span className="rounded-full" style={{ width: '8px', height: '8px', backgroundColor: opponentColor }} />
+              <span style={{ color: '#AFC0D2' }}>{formatCalendarDate(game.date, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+              <span style={{ color: '#1E2D3D' }}>•</span>
+              <span style={{ color: '#8899AA' }}>{getGameTipoffLabel(game)}</span>
+            </div>
           </div>
         </div>
 
-        {/* Score / Status */}
-        <div className="flex-shrink-0 text-right">
+        <div className="sm:text-right">
           {isResult ? (
-            <div className="flex items-center gap-2">
-              <span
-                className="font-bold rounded-lg px-2.5 py-1"
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '0.8rem',
-                  letterSpacing: '0.1em',
-                  color: isWin ? '#00C853' : '#FF3D3D',
-                  backgroundColor: isWin ? 'rgba(0,200,83,0.12)' : 'rgba(255,61,61,0.12)',
-                  border: `1px solid ${isWin ? 'rgba(0,200,83,0.3)' : 'rgba(255,61,61,0.3)'}`,
-                }}
-              >
-                {isWin ? 'W' : 'L'}
-              </span>
-              <span style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '1.1rem',
-                color: '#FFFFFF',
-                letterSpacing: '0.06em',
-              }}>
-                {knicksScore}–{oppScore}
-              </span>
-            </div>
+            <span
+              className="inline-flex px-3 py-1.5 rounded-full text-sm font-semibold"
+              style={{
+                backgroundColor: `${resultColor}1A`,
+                color: resultColor,
+                border: `1px solid ${resultColor}33`,
+                letterSpacing: '0.08em',
+              }}
+            >
+              {scoreLabel}
+            </span>
           ) : (
-            <span style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '0.75rem',
-              letterSpacing: '0.1em',
-              color: '#F58426',
-              opacity: 0.7,
-            }}>
+            <span
+              className="inline-flex px-3 py-1.5 rounded-full text-xs font-semibold"
+              style={{
+                backgroundColor: 'rgba(245,132,38,0.14)',
+                color: '#F58426',
+                border: '1px solid rgba(245,132,38,0.28)',
+                letterSpacing: '0.1em',
+              }}
+            >
               UPCOMING
             </span>
           )}
@@ -171,88 +140,120 @@ function GameCard({ game, isResult }: { game: Game; isResult: boolean }) {
 }
 
 export default async function SchedulePage() {
-  let results: Game[] = [];
-  let upcoming: Game[] = [];
+  let data: Awaited<ReturnType<typeof getKnicksDashboardData>> | null = null;
 
   try {
-    const games = await getKnicksGames();
-    results  = getRecentResults(games, 10);
-    upcoming = getUpcomingGames(games, 10);
-  } catch {
+    data = await getKnicksDashboardData();
+  } catch {}
+
+  if (!data) {
     return (
-      <div className="text-center py-20 fade-in">
-        <p style={{ color: '#FF3D3D', fontSize: '1.1rem' }}>Could not load schedule. Please try again later.</p>
-      </div>
+      <StatePanel
+        title="Could not load schedule"
+        body="The NBA schedule feed is unavailable right now. Please try again shortly."
+        variant="error"
+      />
     );
   }
 
+  const { games, updatedAtLabel } = data;
+  const nextGame = getNextGame(games);
+  const upcoming = getUpcomingGames(games, 8);
+  const results = [...getRecentResults(games, 10)].reverse();
+
   return (
-    <div className="space-y-10 fade-in">
+    <div className="space-y-8 fade-in">
+      <PageHeader
+        title="SCHEDULE"
+        eyebrow="TRACK THE RUN"
+        metadata={['2025-26 Season', 'New York Knicks', updatedAtLabel]}
+      />
 
-      {/* ── Header ── */}
-      <div className="section-label">
-        <div>
-          <h1 style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(2.2rem, 6vw, 3.5rem)',
-            color: '#FFFFFF',
-            letterSpacing: '0.06em',
-            lineHeight: 1,
-          }}>
-            SCHEDULE
-          </h1>
-          <p className="mt-2 text-sm" style={{ color: '#8899AA' }}>
-            2025–26 Season · New York Knicks
+      {nextGame && (
+        <div
+          className="card rounded-3xl p-6 sm:p-7"
+          style={{ border: '1px solid rgba(245,132,38,0.24)' }}
+        >
+          <p className="text-xs font-semibold tracking-widest" style={{ color: '#F58426', letterSpacing: '0.18em' }}>
+            NEXT TIPOFF
           </p>
+          <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 'clamp(2rem, 5vw, 3rem)',
+                  color: '#FFFFFF',
+                  lineHeight: 0.95,
+                  letterSpacing: '0.05em',
+                }}
+              >
+                {getGameMatchupLabel(nextGame)}
+              </h2>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <span style={{ color: '#AFC0D2' }}>{formatCalendarDate(nextGame.date)}</span>
+                <span style={{ color: '#1E2D3D' }}>•</span>
+                <span style={{ color: '#8899AA' }}>{getGameTipoffLabel(nextGame)}</span>
+              </div>
+            </div>
+            {getGameRelativeLabel(nextGame) && (
+              <span
+                className="inline-flex px-3 py-2 rounded-full text-sm font-semibold"
+                style={{
+                  backgroundColor: 'rgba(245,132,38,0.14)',
+                  color: '#F58426',
+                  border: '1px solid rgba(245,132,38,0.28)',
+                  letterSpacing: '0.1em',
+                }}
+              >
+                {getGameRelativeLabel(nextGame)}
+              </span>
+            )}
+          </div>
         </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
+        <SectionShell
+          title="UPCOMING GAMES"
+          subtitle="The next stretch on the schedule."
+          metadata={[`${upcoming.length} games listed`]}
+        >
+          {upcoming.length === 0 ? (
+            <StatePanel
+              title="No upcoming games found"
+              body="The current schedule feed did not return any future Knicks games."
+              variant="empty"
+            />
+          ) : (
+            <div className="space-y-3">
+              {upcoming.map(game => (
+                <GameCard key={game.id} game={game} isResult={false} />
+              ))}
+            </div>
+          )}
+        </SectionShell>
+
+        <SectionShell
+          title="RECENT RESULTS"
+          subtitle="Latest completed Knicks games."
+          metadata={[`${results.length} final scores`]}
+        >
+          {results.length === 0 ? (
+            <StatePanel
+              title="No recent results"
+              body="Completed game results will appear here once the season is underway."
+              variant="empty"
+            />
+          ) : (
+            <div className="space-y-3">
+              {results.map(game => (
+                <GameCard key={game.id} game={game} isResult={true} />
+              ))}
+            </div>
+          )}
+        </SectionShell>
       </div>
-
-      {/* ── Upcoming Games ── */}
-      <section className="fade-in-delay">
-        <div className="section-label mb-5">
-          <h2 style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '1.4rem',
-            color: '#FFFFFF',
-            letterSpacing: '0.06em',
-          }}>
-            UPCOMING GAMES
-          </h2>
-        </div>
-        {upcoming.length === 0 ? (
-          <p style={{ color: '#8899AA' }}>No upcoming games found.</p>
-        ) : (
-          <div className="space-y-2">
-            {upcoming.map(game => (
-              <GameCard key={game.id} game={game} isResult={false} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ── Recent Results ── */}
-      <section className="fade-in-delay-2">
-        <div className="section-label mb-5">
-          <h2 style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '1.4rem',
-            color: '#FFFFFF',
-            letterSpacing: '0.06em',
-          }}>
-            RECENT RESULTS
-          </h2>
-        </div>
-        {results.length === 0 ? (
-          <p style={{ color: '#8899AA' }}>No results yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {[...results].reverse().map(game => (
-              <GameCard key={game.id} game={game} isResult={true} />
-            ))}
-          </div>
-        )}
-      </section>
-
     </div>
   );
 }

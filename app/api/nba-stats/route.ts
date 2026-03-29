@@ -1,18 +1,13 @@
-// app/api/nba-stats/route.ts
-// Next.js Route Handler — acts as a server-side proxy for NBA data.
-// The CDN schedule JSON is ~10MB so we process it here and return only
-// the computed stats the client needs, keeping the browser payload small.
-
 import { NextResponse } from 'next/server';
-
-const CDN_URL =
-  'https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json';
-
-const EAST = new Set([
-  'ATL','BOS','BKN','CHA','CHI','CLE',
-  'DET','IND','MIA','MIL','NYK','ORL',
-  'PHI','TOR','WAS',
-]);
+import {
+  EAST_TRICODES,
+  fetchLeagueScheduleSnapshot,
+} from '@/lib/nba';
+import {
+  sortStandings,
+  updateHeadToHeadRecord,
+  type HeadToHeadMap,
+} from '@/lib/standings';
 
 export type TeamStat = {
   id: number;
@@ -41,123 +36,165 @@ export type GameSummary = {
   awayScore: number;
 };
 
+type Acc = {
+  id: number;
+  city: string;
+  name: string;
+  conference: 'East' | 'West';
+  ppgSum: number;
+  papgSum: number;
+  pointDifferential: number;
+  wins: number;
+  losses: number;
+  conferenceWins: number;
+  conferenceLosses: number;
+  homeW: number;
+  homeL: number;
+  awayW: number;
+  awayL: number;
+  log: boolean[];
+};
+
 export async function GET() {
   try {
-    const res = await fetch(CDN_URL, {
-      next: { revalidate: 3600 },
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-    });
-    if (!res.ok) {
-      return NextResponse.json({ error: 'CDN unavailable' }, { status: 502 });
-    }
+    const snapshot = await fetchLeagueScheduleSnapshot();
+    const completed = snapshot.games.filter(game => game.gameStatus === 3);
 
-    const data = await res.json();
-    const gameDates: { games: Record<string, unknown>[] }[] =
-      data?.leagueSchedule?.gameDates ?? [];
-
-    // Collect all regular-season completed games, sorted chronologically
-    type RawGame = {
-      gameId: string;
-      gameStatus: number;
-      gameDateEst: string;
-      gameDateTimeUTC: string;
-      homeTeam: { teamId: number; teamCity: string; teamName: string; teamTricode: string; score: number };
-      awayTeam: { teamId: number; teamCity: string; teamName: string; teamTricode: string; score: number };
-    };
-
-    const completed: RawGame[] = [];
-    for (const gd of gameDates) {
-      for (const g of gd.games as RawGame[]) {
-        if (g.gameId.startsWith('002') && g.gameStatus === 3) {
-          completed.push(g);
-        }
-      }
-    }
-    completed.sort((a, b) =>
-      a.gameDateTimeUTC.localeCompare(b.gameDateTimeUTC)
-    );
-
-    // Accumulate per-team stats
-    type Acc = {
-      id: number; city: string; name: string;
-      ppgSum: number; papgSum: number;
-      wins: number; losses: number;
-      homeW: number; homeL: number;
-      awayW: number; awayL: number;
-      log: boolean[]; // true = win, in date order
-    };
     const acc = new Map<string, Acc>();
+    const eastHeadToHead: HeadToHeadMap = new Map();
+    const westHeadToHead: HeadToHeadMap = new Map();
 
-    for (const g of completed) {
-      for (const [team, isHome] of [
-        [g.homeTeam, true],
-        [g.awayTeam, false],
-      ] as [RawGame['homeTeam'], boolean][]) {
+    for (const game of completed) {
+      const home = game.homeTeam;
+      const away = game.awayTeam;
+      const homeConference: 'East' | 'West' = EAST_TRICODES.has(home.teamTricode) ? 'East' : 'West';
+      const awayConference: 'East' | 'West' = EAST_TRICODES.has(away.teamTricode) ? 'East' : 'West';
+      const sameConference = homeConference === awayConference;
+      const homeWon = home.score > away.score;
+
+      for (const [team, isHome, conference] of [
+        [home, true, homeConference],
+        [away, false, awayConference],
+      ] as const) {
         const tri = team.teamTricode;
         if (!acc.has(tri)) {
           acc.set(tri, {
-            id: team.teamId, city: team.teamCity, name: team.teamName,
-            ppgSum: 0, papgSum: 0,
-            wins: 0, losses: 0,
-            homeW: 0, homeL: 0,
-            awayW: 0, awayL: 0,
+            id: team.teamId,
+            city: team.teamCity,
+            name: team.teamName,
+            conference,
+            ppgSum: 0,
+            papgSum: 0,
+            pointDifferential: 0,
+            wins: 0,
+            losses: 0,
+            conferenceWins: 0,
+            conferenceLosses: 0,
+            homeW: 0,
+            homeL: 0,
+            awayW: 0,
+            awayL: 0,
             log: [],
           });
         }
-        const s = acc.get(tri)!;
-        const scored  = isHome ? g.homeTeam.score : g.awayTeam.score;
-        const allowed = isHome ? g.awayTeam.score : g.homeTeam.score;
+
+        const row = acc.get(tri)!;
+        const scored = isHome ? home.score : away.score;
+        const allowed = isHome ? away.score : home.score;
         const won = scored > allowed;
-        s.ppgSum  += scored;
-        s.papgSum += allowed;
-        s.log.push(won);
-        if (won) { s.wins++; isHome ? s.homeW++ : s.awayW++; }
-        else     { s.losses++; isHome ? s.homeL++ : s.awayL++; }
+
+        row.ppgSum += scored;
+        row.papgSum += allowed;
+        row.pointDifferential += scored - allowed;
+        row.log.push(won);
+
+        if (won) {
+          row.wins += 1;
+          if (isHome) row.homeW += 1;
+          else row.awayW += 1;
+        } else {
+          row.losses += 1;
+          if (isHome) row.homeL += 1;
+          else row.awayL += 1;
+        }
+
+        if (sameConference) {
+          if (won) row.conferenceWins += 1;
+          else row.conferenceLosses += 1;
+        }
+      }
+
+      if (sameConference) {
+        const map = homeConference === 'East' ? eastHeadToHead : westHeadToHead;
+        updateHeadToHeadRecord(
+          map,
+          homeWon ? home.teamTricode : away.teamTricode,
+          homeWon ? away.teamTricode : home.teamTricode,
+        );
       }
     }
 
-    // Build final team stats
     const teams: Record<string, TeamStat> = {};
-    for (const [tri, s] of acc) {
-      const gp = s.wins + s.losses;
-      const last10 = s.log.slice(-10);
-      const l10w = last10.filter(Boolean).length;
+    for (const [tri, row] of acc) {
+      const gp = row.wins + row.losses;
+      const last10 = row.log.slice(-10);
+      const last10Wins = last10.filter(Boolean).length;
+
       teams[tri] = {
-        id: s.id, city: s.city, name: s.name, tricode: tri,
-        conference: EAST.has(tri) ? 'East' : 'West',
-        wins: s.wins, losses: s.losses, gamesPlayed: gp,
-        ppg: gp > 0 ? parseFloat((s.ppgSum / gp).toFixed(1)) : 0,
-        papg: gp > 0 ? parseFloat((s.papgSum / gp).toFixed(1)) : 0,
-        netRating: gp > 0 ? parseFloat(((s.ppgSum - s.papgSum) / gp).toFixed(1)) : 0,
-        winPct: gp > 0 ? s.wins / gp : 0,
-        homeRecord: { w: s.homeW, l: s.homeL },
-        awayRecord: { w: s.awayW, l: s.awayL },
-        last10: { w: l10w, l: 10 - l10w },
-        seed: 0, // filled below
+        id: row.id,
+        city: row.city,
+        name: row.name,
+        tricode: tri,
+        conference: row.conference,
+        wins: row.wins,
+        losses: row.losses,
+        gamesPlayed: gp,
+        ppg: gp > 0 ? parseFloat((row.ppgSum / gp).toFixed(1)) : 0,
+        papg: gp > 0 ? parseFloat((row.papgSum / gp).toFixed(1)) : 0,
+        netRating: gp > 0 ? parseFloat((row.pointDifferential / gp).toFixed(1)) : 0,
+        winPct: gp > 0 ? row.wins / gp : 0,
+        homeRecord: { w: row.homeW, l: row.homeL },
+        awayRecord: { w: row.awayW, l: row.awayL },
+        last10: { w: last10Wins, l: last10.length - last10Wins },
+        seed: 0,
       };
     }
 
-    // Assign seeds within each conference
-    for (const conf of ['East', 'West'] as const) {
-      const confTeams = Object.values(teams)
-        .filter(t => t.conference === conf)
-        .sort((a, b) => b.wins - a.wins || a.losses - b.losses);
-      confTeams.forEach((t, i) => { teams[t.tricode].seed = i + 1; });
+    for (const conference of ['East', 'West'] as const) {
+      const headToHead = conference === 'East' ? eastHeadToHead : westHeadToHead;
+      const conferenceTeams = sortStandings(
+        Object.values(teams)
+          .filter(team => team.conference === conference)
+          .map(team => ({
+            ...team,
+            teamAbbreviation: team.tricode,
+            teamName: `${team.city} ${team.name}`,
+            conferenceWins: acc.get(team.tricode)?.conferenceWins ?? 0,
+            conferenceLosses: acc.get(team.tricode)?.conferenceLosses ?? 0,
+            pointDifferential: acc.get(team.tricode)?.pointDifferential ?? 0,
+            last10Wins: team.last10.w,
+            last10Losses: team.last10.l,
+          })),
+        headToHead,
+      );
+
+      conferenceTeams.forEach((team, index) => {
+        teams[team.tricode].seed = index + 1;
+      });
     }
 
-    // NYK games for head-to-head lookup (client filters by opponent tricode)
     const knicksGames: GameSummary[] = completed
       .filter(
-        g =>
-          g.homeTeam.teamTricode === 'NYK' ||
-          g.awayTeam.teamTricode === 'NYK'
+        game =>
+          game.homeTeam.teamTricode === 'NYK' ||
+          game.awayTeam.teamTricode === 'NYK',
       )
-      .map(g => ({
-        date: g.gameDateEst.slice(0, 10),
-        homeTricode: g.homeTeam.teamTricode,
-        awayTricode: g.awayTeam.teamTricode,
-        homeScore: g.homeTeam.score,
-        awayScore: g.awayTeam.score,
+      .map(game => ({
+        date: game.gameDateEst.slice(0, 10),
+        homeTricode: game.homeTeam.teamTricode,
+        awayTricode: game.awayTeam.teamTricode,
+        homeScore: game.homeTeam.score,
+        awayScore: game.awayTeam.score,
       }));
 
     return NextResponse.json({ teams, knicksGames });
