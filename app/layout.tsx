@@ -8,8 +8,33 @@ import './globals.css';
 import NavBar from '@/components/NavBar';
 
 export const metadata: Metadata = {
-  title: 'Knicks Hub',
-  description: 'The ultimate New York Knicks fan dashboard',
+  title: {
+    default: 'Knicks Hub',
+    template: '%s | Knicks Hub',
+  },
+  description: 'New York Knicks fan dashboard — live standings, schedule, and Analyst Mode',
+  metadataBase: new URL('https://knicks-hub.vercel.app'),
+  openGraph: {
+    title: 'Knicks Hub',
+    description: 'New York Knicks fan dashboard — live standings, schedule, and Analyst Mode',
+    siteName: 'Knicks Hub',
+    type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Knicks Hub',
+    description: 'New York Knicks fan dashboard — live standings, schedule, and Analyst Mode',
+  },
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'Knicks Hub',
+    statusBarStyle: 'black-translucent',
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
