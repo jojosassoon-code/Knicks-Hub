@@ -142,26 +142,48 @@ h1, h2, h3, h4 {
   box-shadow: inset 3px 0 0 rgba(0,107,182,0.5);
 }
 
-/* Nav active indicator */
-.nav-active {
+/* Nav links — hover underline slides in via scaleX */
+.nav-link {
   position: relative;
 }
-.nav-active::after {
+.nav-link::after {
   content: '';
   position: absolute;
-  bottom: -4px;
+  bottom: 2px;
   left: 0; right: 0;
-  height: 3px;
+  height: 2px;
   background: var(--knicks-orange);
-  border-radius: 2px 2px 0 0;
+  border-radius: 2px;
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+.nav-link:hover {
+  color: #FFFFFF !important;
+}
+.nav-link:hover::after,
+.nav-active.nav-link::after {
+  transform: scaleX(1);
+}
+.nav-active.nav-link {
+  color: #FFFFFF !important;
 }
 
-/* Mobile menu slide-in from right */
-@keyframes slideInRight {
-  from { transform: translateX(100%); opacity: 0; }
-  to   { transform: translateX(0);    opacity: 1; }
+/* Analyst Mode pill on hover */
+.nav-analyst:hover {
+  background: rgba(245,132,38,0.14) !important;
+  border-color: rgba(245,132,38,0.35) !important;
+  color: #F58426 !important;
 }
-.mobile-menu-enter { animation: slideInRight 0.28s cubic-bezier(0.22,1,0.36,1) both; }
+.nav-analyst:hover::after {
+  transform: scaleX(0) !important;
+}
+
+/* Mobile dropdown slide down */
+@keyframes slideDown {
+  from { transform: translateY(-6px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.mobile-menu-dropdown { animation: slideDown 0.22s cubic-bezier(0.22,1,0.36,1) both; }
 
 /* News hero card: single column on mobile, two columns on lg+ */
 .hero-card-grid {
