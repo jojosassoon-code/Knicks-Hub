@@ -29,9 +29,7 @@ export type Article = {
 };
 
 export type NewsBriefing = {
-  headline: string;
-  summary: string;
-  keyPoints: string[];
+  bullets: Array<{ label: string; text: string }>;
   basedOnCount: number;
 };
 
@@ -451,42 +449,45 @@ function buildDeepSummary(article: Article, signals: ArticleSignals | null): str
   return truncate(best, 190);
 }
 
+const TAG_TO_LABEL: Record<NewsTag, string> = {
+  'Injury':       'INJURY',
+  'Playoffs':     'STANDINGS',
+  'Postgame':     'POSTGAME',
+  'Rotation':     'ROSTER',
+  'Trade Buzz':   'ROSTER',
+  'Game Preview': 'MATCHUP',
+  'Off-Court':    'OFF-COURT',
+  'General':      'TRENDING',
+};
+
 function buildBriefing(articles: Article[]): NewsBriefing | null {
-  const briefingArticles = articles
-    .filter(article => article.deepSummary || article.summary)
-    .slice(0, MAX_DEEP_DIVE_ARTICLES);
+  const pool = articles.filter(a => a.deepSummary || a.summary);
+  if (pool.length === 0) return null;
 
-  if (briefingArticles.length === 0) return null;
+  // Pick up to 3 articles with distinct labels (prefer variety)
+  const chosen: Article[] = [];
+  const usedLabels = new Set<string>();
 
-  const tagPriority: NewsTag[] = ['Injury', 'Playoffs', 'Rotation', 'Postgame', 'Game Preview', 'Trade Buzz', 'Off-Court', 'General'];
-  const sortedTags = [...new Set(briefingArticles.map(article => article.tag))]
-    .sort((a, b) => tagPriority.indexOf(a) - tagPriority.indexOf(b));
+  for (const article of pool) {
+    if (chosen.length >= 3) break;
+    const label = TAG_TO_LABEL[article.tag];
+    if (usedLabels.has(label)) continue;
+    usedLabels.add(label);
+    chosen.push(article);
+  }
 
-  const leadingTag = sortedTags[0] ?? 'General';
-  const leadArticle = briefingArticles[0];
-  const headline = leadingTag === 'General'
-    ? 'AI Knicks Briefing'
-    : `AI Knicks Briefing: ${leadingTag} Leads The Day`;
+  // Fill remaining slots with next best if still under 3
+  for (const article of pool) {
+    if (chosen.length >= 3) break;
+    if (!chosen.includes(article)) chosen.push(article);
+  }
 
-  const keyPoints = briefingArticles.slice(0, 4).map(article => {
-    const lead = article.deepSummary ?? article.summary;
-    const why = article.whyItMatters ? ` ${article.whyItMatters}` : '';
-    return truncate(`${article.source.name}: ${lead}${why}`, 180);
-  });
+  const bullets = chosen.slice(0, 3).map(article => ({
+    label: TAG_TO_LABEL[article.tag],
+    text: truncate(article.deepSummary ?? article.summary, 130),
+  }));
 
-  const summaryParts = [
-    leadArticle.deepSummary ?? leadArticle.summary,
-    briefingArticles[1]?.deepSummary ?? briefingArticles[1]?.summary ?? '',
-  ].filter(Boolean);
-
-  const summary = truncate(summaryParts.join(' '), 260);
-
-  return {
-    headline,
-    summary,
-    keyPoints,
-    basedOnCount: briefingArticles.length,
-  };
+  return { bullets, basedOnCount: pool.length };
 }
 
 async function enrichArticles(articles: Article[]): Promise<Article[]> {

@@ -163,6 +163,24 @@ h1, h2, h3, h4 {
 }
 .mobile-menu-enter { animation: slideInRight 0.28s cubic-bezier(0.22,1,0.36,1) both; }
 
+/* News hero card: single column on mobile, two columns on lg+ */
+.hero-card-grid {
+  grid-template-columns: 1fr;
+}
+@media (min-width: 1024px) {
+  .hero-card-grid {
+    grid-template-columns: 1.4fr 0.8fr;
+  }
+  .hero-visual-panel {
+    display: flex !important;
+  }
+}
+@media (max-width: 1023px) {
+  .hero-visual-panel {
+    display: none !important;
+  }
+}
+
 /* Pulsing orange dot for TODAY badge */
 @keyframes pulseDot {
   0%, 100% { transform: scale(1);   opacity: 1; }

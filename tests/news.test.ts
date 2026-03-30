@@ -89,7 +89,7 @@ test('buildTakeaways produces concise ranked bullets', () => {
   assert.match(takeaways[1] ?? '', /^Injury:/);
 });
 
-test('buildBriefing turns top stories into a consolidated ai briefing', () => {
+test('buildBriefing turns top stories into a war room report with labeled bullets', () => {
   const briefing = __newsTestUtils.buildBriefing([
     {
       title: 'Knicks playoff race tightens after key win',
@@ -120,7 +120,8 @@ test('buildBriefing turns top stories into a consolidated ai briefing', () => {
   ]);
 
   assert.ok(briefing);
-  assert.match(briefing?.headline ?? '', /Injury|Playoffs|AI Knicks Briefing/i);
   assert.equal(briefing?.basedOnCount, 2);
-  assert.equal(briefing?.keyPoints.length, 2);
+  assert.equal(briefing?.bullets.length, 2);
+  assert.match(briefing?.bullets[0]?.label ?? '', /STANDINGS|INJURY/);
+  assert.ok(briefing?.bullets[0]?.text.length ?? 0 > 10);
 });

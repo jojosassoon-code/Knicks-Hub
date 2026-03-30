@@ -1,24 +1,73 @@
-import { getKnicksNews, type Article, type NewsBriefing, type NewsTag } from '@/lib/news';
-import PageHeader from '@/components/ui/PageHeader';
 import StatePanel from '@/components/ui/StatePanel';
+import NewsGrid from '@/components/news/NewsGrid';
+import { TAG_COLORS } from '@/lib/newsColors';
+import { getKnicksNews, type Article, type NewsBriefing, type NewsTag } from '@/lib/news';
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function formatTodayDate(): string {
+  return new Date().toLocaleDateString('en-US', {
+    weekday: 'short',
+    month:   'short',
+    day:     'numeric',
+    year:    'numeric',
+  });
+}
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const hours = Math.floor(diff / 3_600_000);
   if (hours < 1) return 'Just now';
   if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
-function TagBadge({ tag }: { tag: NewsTag }) {
+// ── Section label (orange left-border accent) ─────────────────────────────────
+
+function SectionLabel({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'stretch', gap: '0.75rem', marginBottom: '1.25rem' }}>
+      <div style={{ width: '3px', borderRadius: '2px', background: '#F58426', flexShrink: 0 }} />
+      <div>
+        <h2
+          style={{
+            fontFamily: 'Bebas Neue, sans-serif',
+            fontSize: '1.1rem',
+            color: '#FFFFFF',
+            letterSpacing: '0.1em',
+            margin: 0,
+          }}
+        >
+          {title}
+        </h2>
+        {subtitle && (
+          <p style={{ fontFamily: 'DM Sans, sans-serif', color: '#8899AA', fontSize: '0.82rem', marginTop: '0.15rem' }}>
+            {subtitle}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Category pill ──────────────────────────────────────────────────────────────
+
+function CategoryPill({ tag }: { tag: NewsTag }) {
+  const s = TAG_COLORS[tag];
   return (
     <span
-      className="inline-flex items-center rounded-full border px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em]"
       style={{
-        borderColor: 'rgba(245,132,38,0.28)',
-        background: 'rgba(245,132,38,0.1)',
-        color: '#F58426',
+        display: 'inline-block',
+        fontFamily: 'DM Sans, sans-serif',
+        fontSize: '0.62rem',
+        fontWeight: 700,
+        letterSpacing: '0.18em',
+        textTransform: 'uppercase',
+        padding: '0.2rem 0.65rem',
+        borderRadius: '100px',
+        background: s.bg,
+        color: s.text,
+        border: `1px solid ${s.border}`,
       }}
     >
       {tag}
@@ -26,314 +75,371 @@ function TagBadge({ tag }: { tag: NewsTag }) {
   );
 }
 
-function SectionHeading({ title, description }: { title: string; description: string }) {
+// ── 1. MASTHEAD ────────────────────────────────────────────────────────────────
+
+function Masthead() {
   return (
-    <div className="space-y-2">
-      <div className="section-label">
-        <h2
+    <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+      {/* Left: title + underline accent */}
+      <div>
+        <h1
           style={{
-            fontSize: 'clamp(1.4rem, 3vw, 1.9rem)',
+            fontFamily: 'Bebas Neue, sans-serif',
+            fontSize: 'clamp(2.8rem, 7vw, 4.5rem)',
+            color: '#FFFFFF',
+            letterSpacing: '0.05em',
             lineHeight: 1,
+            margin: 0,
           }}
         >
-          {title}
-        </h2>
+          KNICKS INTEL
+        </h1>
+        {/* Orange underline */}
+        <div
+          style={{
+            height: '3px',
+            width: '3.5rem',
+            background: '#F58426',
+            borderRadius: '2px',
+            marginTop: '0.4rem',
+          }}
+        />
+        <p
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: '0.88rem',
+            color: '#8899AA',
+            marginTop: '0.6rem',
+          }}
+        >
+          Latest coverage from around the league
+        </p>
       </div>
-      <p className="max-w-2xl text-sm sm:text-[0.95rem]" style={{ color: '#8899AA', lineHeight: 1.6 }}>
-        {description}
-      </p>
-    </div>
-  );
-}
 
-function MetadataLine({ article }: { article: Article }) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs sm:text-sm" style={{ color: '#8899AA' }}>
-      <span style={{ color: '#FFFFFF', fontWeight: 600 }}>{article.source.name}</span>
-      <span>•</span>
-      <span>{timeAgo(article.publishedAt)}</span>
-      <TagBadge tag={article.tag} />
-    </div>
-  );
-}
-
-function BriefingPanel({ briefing }: { briefing: NewsBriefing }) {
-  return (
-    <section
-      className="card overflow-hidden rounded-[28px]"
-      style={{
-        background: 'linear-gradient(135deg, rgba(0,107,182,0.18), rgba(245,132,38,0.08) 48%, rgba(10,21,32,0.98) 100%)',
-      }}
-    >
-      <div className="grid gap-0 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="p-6 sm:p-8 lg:p-10">
-          <div className="mb-4 flex items-center gap-3">
-            <span
-              className="rounded-full border px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.22em]"
-              style={{
-                borderColor: 'rgba(143,203,255,0.28)',
-                background: 'rgba(143,203,255,0.1)',
-                color: '#8FCBFF',
-              }}
-            >
-              AI Briefing
-            </span>
-            <span className="text-xs uppercase tracking-[0.18em]" style={{ color: '#8899AA' }}>
-              Based on {briefing.basedOnCount} key articles
-            </span>
-          </div>
-
-          <h2
+      {/* Right: LIVE FEED badge + date */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingBottom: '0.25rem' }}>
+        {/* Pulsing green dot badge */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            background: 'rgba(0,200,83,0.1)',
+            border: '1px solid rgba(0,200,83,0.28)',
+            borderRadius: '100px',
+            padding: '0.25rem 0.75rem',
+          }}
+        >
+          <span
+            className="pulse-dot"
             style={{
-              fontSize: 'clamp(1.9rem, 4vw, 3rem)',
-              lineHeight: 0.98,
-              color: '#FFFFFF',
+              display: 'inline-block',
+              width: '7px',
+              height: '7px',
+              borderRadius: '50%',
+              background: '#00C853',
+              flexShrink: 0,
+              animationDuration: '1.8s',
+            }}
+          />
+          <span
+            style={{
+              fontFamily: 'DM Sans, sans-serif',
+              fontSize: '0.65rem',
+              fontWeight: 700,
+              letterSpacing: '0.18em',
+              color: '#00C853',
+              textTransform: 'uppercase',
             }}
           >
-            {briefing.headline}
-          </h2>
-
-          <p className="mt-5 max-w-3xl text-sm sm:text-base" style={{ color: '#E7F0F8', lineHeight: 1.8 }}>
-            {briefing.summary}
-          </p>
+            Live Feed
+          </span>
         </div>
 
-        <div
-          className="border-t p-6 sm:p-8 lg:border-l lg:border-t-0"
-          style={{ borderColor: 'rgba(255,255,255,0.08)' }}
+        {/* Date */}
+        <span
+          style={{
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: '0.78rem',
+            color: '#8899AA',
+          }}
         >
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em]" style={{ color: '#F58426' }}>
-            Consolidated Key Points
-          </p>
-          <div className="mt-4 space-y-3">
-            {briefing.keyPoints.map((point, index) => (
-              <div
-                key={`${point}-${index}`}
-                className="rounded-2xl border p-4"
-                style={{
-                  borderColor: 'rgba(255,255,255,0.08)',
-                  background: 'rgba(8,12,20,0.22)',
-                }}
-              >
-                <p className="text-sm sm:text-[0.95rem]" style={{ color: '#D7E2EC', lineHeight: 1.7 }}>
-                  {point}
-                </p>
-              </div>
-            ))}
+          {formatTodayDate()}
+        </span>
+      </div>
+    </header>
+  );
+}
+
+// ── 2. WAR ROOM REPORT ─────────────────────────────────────────────────────────
+
+function WarRoomReport({ briefing }: { briefing: NewsBriefing }) {
+  return (
+    <section
+      style={{
+        background: 'linear-gradient(160deg, #0F1923 0%, #0A1520 100%)',
+        border: '1px solid #1E2D3D',
+        borderTop: '3px solid #F58426',
+        borderRadius: '16px',
+        padding: '1.5rem 1.75rem',
+      }}
+    >
+      <SectionLabel
+        title="War Room Report"
+        subtitle={`Synthesized from ${briefing.basedOnCount} top articles`}
+      />
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+        {briefing.bullets.map((bullet, i) => (
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '1rem',
+              padding: '0.75rem 0',
+              borderBottom: i < briefing.bullets.length - 1 ? '1px solid rgba(30,45,61,0.6)' : 'none',
+            }}
+          >
+            {/* Label */}
+            <span
+              style={{
+                fontFamily: 'Bebas Neue, sans-serif',
+                fontSize: '0.9rem',
+                color: '#F58426',
+                letterSpacing: '0.1em',
+                flexShrink: 0,
+                minWidth: '6rem',
+              }}
+            >
+              {bullet.label}
+            </span>
+            {/* Text */}
+            <span
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '0.92rem',
+                color: '#E7F0F8',
+                lineHeight: 1.55,
+              }}
+            >
+              {bullet.text}
+            </span>
           </div>
-        </div>
+        ))}
       </div>
     </section>
   );
 }
 
-function TopStoryCard({ article }: { article: Article }) {
+// ── 3. HERO CARD ───────────────────────────────────────────────────────────────
+
+function HeroCard({ article }: { article: Article }) {
+  const tagStyle = TAG_COLORS[article.tag];
+
   return (
-    <a
-      href={article.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="card card-orange group block overflow-hidden rounded-[28px]"
-      style={{ textDecoration: 'none' }}
-    >
-      <div className="grid gap-0 lg:grid-cols-[1.3fr_0.9fr]">
-        <div className="p-6 sm:p-8 lg:p-10">
-          <div className="mb-5 flex items-center gap-3">
-            <span
-              className="rounded-full border px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.22em]"
-              style={{
-                borderColor: 'rgba(255,255,255,0.14)',
-                background: 'rgba(255,255,255,0.06)',
-                color: '#FFFFFF',
-              }}
-            >
-              Top Story
-            </span>
-          </div>
+    <section>
+      <SectionLabel title="Top Story" subtitle="Highest-ranked article from the current feed" />
 
-          <MetadataLine article={article} />
-
-          <h3
-            className="mt-5 text-balance group-hover:text-orange-300"
-            style={{
-              fontSize: 'clamp(2rem, 5vw, 3.3rem)',
-              lineHeight: 0.96,
-              color: '#FFFFFF',
-              transition: 'color 180ms ease',
-            }}
-          >
-            {article.title}
-          </h3>
-
-          <div className="mt-6 space-y-5">
-            <div>
-              <p className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.2em]" style={{ color: '#F58426' }}>
-                Summary
-              </p>
-              <p className="max-w-2xl text-sm sm:text-base" style={{ color: '#D7E2EC', lineHeight: 1.7 }}>
-                {article.deepSummary ?? article.summary}
-              </p>
-            </div>
-
-            {article.whyItMatters && (
-              <div
-                className="rounded-2xl border p-4"
-                style={{
-                  borderColor: 'rgba(245,132,38,0.18)',
-                  background: 'linear-gradient(180deg, rgba(245,132,38,0.08), rgba(245,132,38,0.03))',
-                }}
-              >
-                <p className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.2em]" style={{ color: '#F58426' }}>
-                  Why It Matters
-                </p>
-                <p className="text-sm sm:text-base" style={{ color: '#FFF4EB', lineHeight: 1.7 }}>
-                  {article.whyItMatters}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div
-          className="relative min-h-[220px] overflow-hidden border-t lg:border-t-0 lg:border-l"
-          style={{
-            borderColor: 'rgba(255,255,255,0.08)',
-            background: article.image
-              ? `linear-gradient(180deg, rgba(8,12,20,0.05), rgba(8,12,20,0.6)), url(${article.image}) center/cover`
-              : 'linear-gradient(160deg, rgba(0,107,182,0.32), rgba(245,132,38,0.12), rgba(8,12,20,0.92))',
-          }}
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_55%)]" />
-          <div className="absolute bottom-0 left-0 right-0 p-6">
-            <div
-              className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[0.72rem] font-semibold uppercase tracking-[0.18em]"
-              style={{
-                borderColor: 'rgba(255,255,255,0.12)',
-                background: 'rgba(8,12,20,0.6)',
-                color: '#FFFFFF',
-                backdropFilter: 'blur(8px)',
-              }}
-            >
-              Open Article
-              <span aria-hidden="true">↗</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </a>
-  );
-}
-
-function TakeawaysPanel({ takeaways }: { takeaways: string[] }) {
-  return (
-    <div
-      className="card rounded-[24px] p-5 sm:p-6"
-      style={{
-        background: 'linear-gradient(180deg, rgba(15,25,35,0.96), rgba(9,17,27,0.98))',
-      }}
-    >
-      <SectionHeading
-        title="What Matters Today"
-        description="Fast reads pulled from the most relevant Knicks developments in the current feed."
-      />
-
-      <div className="mt-5 space-y-3">
-        {takeaways.map((takeaway, index) => (
-          <div
-            key={`${takeaway}-${index}`}
-            className="flex gap-3 rounded-2xl border p-4"
-            style={{
-              borderColor: 'rgba(30,45,61,0.9)',
-              background: 'rgba(255,255,255,0.02)',
-            }}
-          >
-            <span
-              className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[0.72rem] font-semibold"
-              style={{
-                background: 'rgba(0,107,182,0.18)',
-                color: '#8FCBFF',
-              }}
-            >
-              {index + 1}
-            </span>
-            <p className="text-sm sm:text-[0.95rem]" style={{ color: '#D7E2EC', lineHeight: 1.6 }}>
-              {takeaway}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function IntelCard({ article }: { article: Article }) {
-  return (
-    <article
-      className="card flex h-full flex-col rounded-[24px] p-5 sm:p-6"
-      style={{
-        background: 'linear-gradient(180deg, rgba(15,25,35,0.96), rgba(10,21,32,1))',
-      }}
-    >
-      <MetadataLine article={article} />
-
-      <h3
-        className="mt-4 text-balance"
+      <a
+        href={article.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="card card-orange"
         style={{
-          fontSize: '1.35rem',
-          color: '#FFFFFF',
-          lineHeight: 1.1,
+          display: 'grid',
+          gridTemplateColumns: '1fr',
+          borderRadius: '16px',
+          overflow: 'hidden',
+          textDecoration: 'none',
+          minHeight: '280px',
         }}
       >
-        {article.title}
-      </h3>
+        <div className="lg:grid" style={{ display: 'contents' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr',
+            }}
+            className="hero-card-grid"
+          >
+            {/* Left: content */}
+            <div style={{ padding: '2rem 2.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {/* Source + tag */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <span
+                  style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.22em',
+                    color: '#F58426',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {article.source.name}
+                </span>
+                <CategoryPill tag={article.tag} />
+                <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.75rem', color: '#8899AA' }}>
+                  {timeAgo(article.publishedAt)}
+                </span>
+              </div>
 
-      <p className="mt-4 flex-1 text-sm sm:text-[0.95rem]" style={{ color: '#D7E2EC', lineHeight: 1.7 }}>
-        {article.deepSummary ?? article.summary}
-      </p>
+              {/* Headline */}
+              <h2
+                style={{
+                  fontFamily: 'Bebas Neue, sans-serif',
+                  fontSize: 'clamp(1.8rem, 4vw, 2.4rem)',
+                  color: '#FFFFFF',
+                  lineHeight: 1.05,
+                  letterSpacing: '0.03em',
+                  margin: 0,
+                }}
+              >
+                {article.title}
+              </h2>
 
-      {article.whyItMatters && (
-        <p className="mt-4 text-sm" style={{ color: '#8FB6D8', lineHeight: 1.6 }}>
-          <span className="font-semibold uppercase tracking-[0.16em]" style={{ color: '#F58426', fontSize: '0.68rem' }}>
-            Why It Matters
-          </span>{' '}
-          {article.whyItMatters}
-        </p>
-      )}
+              {/* Summary */}
+              <p
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: '0.92rem',
+                  color: '#AFC0D2',
+                  lineHeight: 1.7,
+                  maxWidth: '42rem',
+                }}
+              >
+                {article.deepSummary ?? article.summary}
+              </p>
 
-      <div className="mt-5">
-        <a
-          href={article.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[0.75rem] font-semibold uppercase tracking-[0.18em]"
-          style={{
-            borderColor: 'rgba(30,45,61,0.95)',
-            color: '#FFFFFF',
-            background: 'rgba(255,255,255,0.02)',
-            textDecoration: 'none',
-          }}
-        >
-          Open Article
-          <span aria-hidden="true">↗</span>
-        </a>
-      </div>
-    </article>
+              {/* CTA */}
+              <div style={{ marginTop: '0.5rem' }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    color: '#FFFFFF',
+                    background: 'rgba(0,107,182,0.2)',
+                    border: '1px solid rgba(0,107,182,0.4)',
+                    borderRadius: '8px',
+                    padding: '0.5rem 1.1rem',
+                    transition: 'background 0.15s ease',
+                  }}
+                >
+                  Open Article
+                  <span aria-hidden="true" style={{ fontSize: '0.85rem' }}>↗</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Right: graphic panel */}
+            <div
+              className="hero-visual-panel"
+              style={{
+                position: 'relative',
+                minHeight: '180px',
+                background: 'linear-gradient(160deg, rgba(0,107,182,0.18) 0%, rgba(8,12,20,0.95) 100%)',
+                borderLeft: '1px solid rgba(255,255,255,0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Huge faded category word as texture */}
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                  overflow: 'hidden',
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: 'Bebas Neue, sans-serif',
+                    fontSize: 'clamp(5rem, 12vw, 9rem)',
+                    color: '#FFFFFF',
+                    opacity: 0.06,
+                    letterSpacing: '0.04em',
+                    lineHeight: 1,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {article.tag.toUpperCase()}
+                </span>
+              </div>
+
+              {/* Source name centered */}
+              <div style={{ position: 'relative', textAlign: 'center', padding: '1.5rem' }}>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '40px',
+                      height: '3px',
+                      background: tagStyle.text,
+                      borderRadius: '2px',
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: 'Bebas Neue, sans-serif',
+                      fontSize: '1.3rem',
+                      color: '#FFFFFF',
+                      letterSpacing: '0.1em',
+                      opacity: 0.85,
+                    }}
+                  >
+                    {article.source.name.toUpperCase()}
+                  </span>
+                  <div
+                    style={{
+                      width: '40px',
+                      height: '3px',
+                      background: tagStyle.text,
+                      borderRadius: '2px',
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </a>
+    </section>
   );
 }
 
+// ── Page ───────────────────────────────────────────────────────────────────────
+
 export default async function NewsPage() {
-  const { articles, takeaways, briefing, error } = await getKnicksNews();
-  const topStory = articles[0];
-  const latestIntel = articles.slice(1);
+  const { articles, briefing, error } = await getKnicksNews();
+  const topStory     = articles[0];
+  const gridArticles = articles.slice(1);
 
   return (
-    <div className="space-y-8 fade-in">
-      <PageHeader
-        title="KNICKS INTEL"
-        eyebrow="NEWS DESK"
-        metadata={['Curated Knicks coverage', 'Consolidated AI briefing', 'Powered by GNews']}
-      />
+    <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
 
+      <Masthead />
+
+      {/* Error / empty states */}
       {error === 'no_key' && (
         <StatePanel
           title="News coming soon"
@@ -362,30 +468,23 @@ export default async function NewsPage() {
         />
       )}
 
-      {briefing && <BriefingPanel briefing={briefing} />}
+      {/* War Room Report */}
+      {briefing && <WarRoomReport briefing={briefing} />}
 
+      {/* Top Story hero */}
       {topStory && (
-        <div className="space-y-8 fade-in-delay">
-          <TopStoryCard article={topStory} />
+        <div className="fade-in-delay" style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+          <HeroCard article={topStory} />
 
-          {takeaways.length > 0 && <TakeawaysPanel takeaways={takeaways} />}
-
-          {latestIntel.length > 0 && (
-            <section className="space-y-5 fade-in-delay-2">
-              <SectionHeading
-                title="Latest Knicks Intel"
-                description="A cleaner stream of the remaining stories after duplicate removal, source weighting, relevance ranking, and limited article-level synthesis."
-              />
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {latestIntel.map(article => (
-                  <IntelCard key={article.url} article={article} />
-                ))}
-              </div>
-            </section>
+          {/* Filterable grid */}
+          {gridArticles.length > 0 && (
+            <div className="fade-in-delay-2">
+              <NewsGrid articles={gridArticles} />
+            </div>
           )}
         </div>
       )}
+
     </div>
   );
 }
