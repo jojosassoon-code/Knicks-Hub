@@ -1,36 +1,116 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏀 Knicks Hub
 
-## Getting Started
+A New York Knicks fan dashboard built with Next.js and Tailwind CSS. Live standings, schedule, a playoff scenario tool, and Knicks news — all in one place.
 
-First, run the development server:
+## Pages
+
+| Page | URL | What it does |
+|---|---|---|
+| Home | `/` | Team record, East seed, next game |
+| Standings | `/standings` | Full Eastern Conference standings table |
+| Schedule | `/schedule` | Last 10 results + next 10 upcoming games |
+| What-If | `/whatif` | Interactive playoff scenario simulator |
+| News | `/news` | Latest Knicks headlines via GNews |
+
+---
+
+## Running Locally
+
+### 1. Install dependencies
+
+```bash
+cd knicks-hub
+npm install
+```
+
+### 2. Add your GNews API key (optional — for the News page)
+
+1. Go to [gnews.io](https://gnews.io) and sign up for a free account
+2. Copy your API key from the dashboard
+3. Open the file `.env.local` in the project folder
+4. Replace the empty value so it looks like this:
+
+```
+GNEWS_API_KEY=abc123yourkeyhere
+```
+
+The News page will work with a placeholder message until you add the key — all other pages work without it.
+
+### 3. Start the development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploying to Vercel
 
-## Learn More
+Vercel is the easiest way to get this live on the internet for free.
 
-To learn more about Next.js, take a look at the following resources:
+### Step-by-step
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. **Push your code to GitHub**
+   - Create a new repository on github.com
+   - In your project folder, run:
+     ```bash
+     git add .
+     git commit -m "Initial Knicks Hub"
+     git remote add origin https://github.com/YOUR_USERNAME/knicks-hub.git
+     git push -u origin main
+     ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+2. **Import to Vercel**
+   - Go to [vercel.com](https://vercel.com) and sign up (free)
+   - Click **"Add New Project"**
+   - Select your `knicks-hub` GitHub repository
+   - Click **Deploy**
 
-## Deploy on Vercel
+3. **Add your GNews API key to Vercel**
+   - In your Vercel project dashboard, go to **Settings → Environment Variables**
+   - Add a variable:
+     - Name: `GNEWS_API_KEY`
+     - Value: your key from gnews.io
+   - Click **Save** and then **Redeploy**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+That's it! Vercel automatically rebuilds your site whenever you push new code to GitHub.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Data Sources
+
+- **NBA Data**: [balldontlie.io](https://www.balldontlie.io) — free, no API key required
+- **News**: [GNews](https://gnews.io) — free tier (10 results per request, 100 requests/day)
+
+Data is cached by Next.js:
+- Standings & schedule: **24 hours** (refreshed daily)
+- News: **1 hour** (refreshed hourly)
+
+---
+
+## Project Structure
+
+```
+knicks-hub/
+├── app/
+│   ├── layout.tsx        ← Shared layout (NavBar lives here)
+│   ├── page.tsx          ← Home page
+│   ├── standings/page.tsx
+│   ├── schedule/page.tsx
+│   ├── whatif/page.tsx
+│   └── news/page.tsx
+├── components/
+│   ├── NavBar.tsx        ← Navigation bar
+│   └── WhatIfTool.tsx    ← Interactive scenario tool
+├── lib/
+│   ├── nba.ts            ← All balldontlie API calls
+│   └── news.ts           ← GNews API call
+├── .env.local            ← Your secret keys (never commit this)
+└── README.md
+```
+
+---
+
+*Not affiliated with the New York Knicks or the NBA.*

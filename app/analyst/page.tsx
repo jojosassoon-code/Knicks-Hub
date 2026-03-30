@@ -593,6 +593,8 @@ type ApiData = {
 type PlayerData = {
   byTeam: Record<string, PlayerStat[]>;
   integrity: PlayerStatsResponse['integrity'];
+  error?: boolean;
+  reason?: string;
 };
 
 async function fetchJsonWithTimeout<T>(url: string, timeoutMs: number): Promise<T> {
@@ -646,6 +648,7 @@ export default function AnalystPage() {
   const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -657,6 +660,7 @@ export default function AnalystPage() {
 
         setData(teamStats);
         setLoading(false);
+        setLastUpdated(new Date());
       } catch {
         if (cancelled) return;
         setFetchError('Could not load stats. Please refresh.');
@@ -680,6 +684,8 @@ export default function AnalystPage() {
               'Analyst Mode is using a safe fallback and will withhold X-factor picks instead of showing stale players.',
             ],
           },
+          error: true,
+          reason: 'NBA Stats API unavailable',
         });
       }
     }
@@ -764,6 +770,17 @@ export default function AnalystPage() {
         eyebrow="MATCHUP LAB"
         metadata={['2025-26 Season', 'Matchup Analysis', 'New York Knicks']}
       />
+
+      {/* ── Last Updated ── */}
+      {lastUpdated && (
+        <p className="text-xs -mt-4" style={{ color: 'rgba(147,197,253,0.45)' }}>
+          Last updated:{' '}
+          {(() => {
+            const mins = Math.floor((Date.now() - lastUpdated.getTime()) / 60000);
+            return mins < 1 ? 'just now' : `${mins} minute${mins !== 1 ? 's' : ''} ago`;
+          })()}
+        </p>
+      )}
 
       {/* ── Opponent Selector ── */}
       <div
@@ -1208,8 +1225,10 @@ export default function AnalystPage() {
                   05 — X-FACTORS
                 </h2>
                 <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: '#111d35', border: '1px solid rgba(0,107,182,0.25)' }}>
-                  <p style={{ color: 'rgba(147,197,253,0.5)' }}>
-                    {playerData?.integrity.notes[0] ?? 'Player data unavailable right now.'}
+                  <p style={{ color: playerData?.error ? '#F58426' : 'rgba(147,197,253,0.5)' }}>
+                    {playerData?.error
+                      ? 'Live data temporarily unavailable — NBA Stats API is down. Try refreshing in a few minutes.'
+                      : (playerData?.integrity.notes[0] ?? 'Player data unavailable right now.')}
                   </p>
                 </div>
               </section>

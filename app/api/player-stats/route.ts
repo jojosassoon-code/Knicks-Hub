@@ -11,6 +11,8 @@ export type PlayerStatsResponse = {
     season: string;
     notes: string[];
   };
+  error?: boolean;
+  reason?: string;
 };
 
 export async function GET() {
@@ -42,6 +44,8 @@ export async function GET() {
             'Analyst Mode is using a safe fallback and will withhold X-factor picks instead of showing stale players.',
           ],
         },
+        error: true,
+        reason: 'NBA Stats API unavailable',
       } satisfies PlayerStatsResponse,
     );
   }

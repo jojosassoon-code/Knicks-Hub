@@ -37,7 +37,7 @@ const NBA_STATS_HEADERS = {
 };
 
 const REVALIDATE_SECONDS = 60 * 60 * 6;
-const NBA_STATS_TIMEOUT_MS = 6000;
+const NBA_STATS_TIMEOUT_MS = 8000;
 
 function getValue<T>(
   row: Array<string | number | null>,
