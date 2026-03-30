@@ -163,6 +163,23 @@ h1, h2, h3, h4 {
 }
 .mobile-menu-enter { animation: slideInRight 0.28s cubic-bezier(0.22,1,0.36,1) both; }
 
+/* Pulsing orange dot for TODAY badge */
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1);   opacity: 1; }
+  50%       { transform: scale(1.6); opacity: 0.55; }
+}
+.pulse-dot { animation: pulseDot 1.4s ease-in-out infinite; }
+
+/* Fast Paths card hover */
+.fast-path-card:hover {
+  border-color: rgba(245,132,38,0.45) !important;
+  box-shadow: 0 8px 32px rgba(245,132,38,0.16), 0 0 0 1px rgba(245,132,38,0.3) !important;
+  transform: translateY(-2px);
+}
+.fast-path-card:hover .fast-path-icon {
+  color: #F58426 !important;
+}
+
 /* Shared skeleton surfaces */
 @keyframes skeletonPulse {
   0% { opacity: 0.45; }
